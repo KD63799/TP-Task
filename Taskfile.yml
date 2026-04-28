@@ -1,0 +1,90 @@
+version: '3'
+
+silent: false
+
+vars:
+  APP_NAME: tp-task
+
+tasks:
+  default:
+    desc: Affiche toutes les tâches disponibles
+    cmds:
+      - task --list
+    silent: true
+
+  # ──────────────────────────────────────────────
+  # DÉPENDANCES
+  # ──────────────────────────────────────────────
+  install:
+    desc: Installe les dépendances npm (ignoré si package-lock.json est à jour)
+    cmds:
+      - npm ci
+    sources:
+      - package.json
+      - package-lock.json
+    generates:
+      - node_modules/.package-lock.json
+
+  # ──────────────────────────────────────────────
+  # BUILD
+  # ──────────────────────────────────────────────
+  build:
+    desc: Compile les images Docker (production, sans cache)
+    deps: [install]
+    cmds:
+      - docker compose build --no-cache
+
+  # ──────────────────────────────────────────────
+  # DÉVELOPPEMENT LOCAL (sans Docker)
+  # ──────────────────────────────────────────────
+  dev:
+    desc: Lance le serveur de développement Angular avec hot reload
+    deps: [install]
+    cmds:
+      - npm run start
+
+  # ──────────────────────────────────────────────
+  # STACK DOCKER COMPOSE
+  # ──────────────────────────────────────────────
+  deploy:
+    desc: Lance la stack complète via Docker Compose en arrière-plan
+    deps: [build]
+    cmds:
+      - docker compose up -d
+      - echo "Stack démarrée → http://localhost:4200"
+
+  logs:
+    desc: "Affiche les logs en continu — filtrer par service : task logs SERVICE=app"
+    vars:
+      SERVICE: '{{.SERVICE | default ""}}'
+    cmds:
+      - docker compose logs -f {{.SERVICE}}
+
+  restart:
+    desc: Redémarre proprement la stack (arrêt complet puis redéploiement)
+    cmds:
+      - task: stop
+      - task: deploy
+
+  stop:
+    desc: Arrête et supprime les conteneurs
+    cmds:
+      - docker compose down
+
+  # ──────────────────────────────────────────────
+  # QUALITÉ (shift left)
+  # ──────────────────────────────────────────────
+  test:
+    desc: Lance les tests unitaires
+    deps: [install]
+    cmds:
+      - npm run test
+
+  # ──────────────────────────────────────────────
+  # NETTOYAGE
+  # ──────────────────────────────────────────────
+  clean:
+    desc: Supprime dist/, node_modules/ et les images Docker locales
+    cmds:
+      - docker compose down --volumes --rmi local
+      - rm -rf dist/ node_modules/
