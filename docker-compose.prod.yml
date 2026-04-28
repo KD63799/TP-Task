@@ -3,7 +3,7 @@
 # IMAGE_TAG et DOCKER_USER sont injectés par le fichier .env présent sur le serveur.
 services:
   app:
-    image: ${DOCKER_USER}/tp-task:${IMAGE_TAG}
+    image: ${DOCKER_USER}/tp-task:${IMAGE_TAG:-latest}
     ports:
-      - "80:80"
-    restart: unless-stopped
+      - "8080:80"
+    restart: always
