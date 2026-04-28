@@ -74,11 +74,30 @@ tasks:
   # ──────────────────────────────────────────────
   # QUALITÉ (shift left)
   # ──────────────────────────────────────────────
+  lint:
+    desc: "Vérifie le formatage du code source — exit code non-nul si échec"
+    deps: [install]
+    cmds:
+      - npm run lint
+
+  format:
+    desc: Corrige automatiquement le formatage (ne pas utiliser en CI)
+    deps: [install]
+    cmds:
+      - npx prettier --write "src/**/*.{ts,html,css}"
+
   test:
-    desc: Lance les tests unitaires
+    desc: Lance les tests unitaires et affiche le résultat (pass / fail / nombre)
     deps: [install]
     cmds:
       - npm run test
+
+  ci:
+    desc: "Pipeline local : lint → test → build — s'arrête à la première erreur"
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
 
   # ──────────────────────────────────────────────
   # NETTOYAGE
