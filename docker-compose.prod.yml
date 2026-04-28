@@ -1,0 +1,9 @@
+# Fichier utilisé sur le serveur distant.
+# L'image est déjà construite et publiée sur le registry — pas de "build:" ici.
+# IMAGE_TAG et DOCKER_USER sont injectés par le fichier .env présent sur le serveur.
+services:
+  app:
+    image: ${DOCKER_USER}/tp-task:${IMAGE_TAG:-latest}
+    ports:
+      - "8080:80"
+    restart: always

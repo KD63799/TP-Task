@@ -2,8 +2,14 @@ version: '3'
 
 silent: false
 
+# Charge automatiquement les variables depuis .env (jamais versionné)
+dotenv: ['.env']
+
 vars:
   APP_NAME: tp-task
+  # Hash Git court — calculé une fois, réutilisé dans push et deploy:*
+  GIT_SHA:
+    sh: git rev-parse --short HEAD
 
 tasks:
   default:
@@ -26,10 +32,10 @@ tasks:
       - node_modules/.package-lock.json
 
   # ──────────────────────────────────────────────
-  # BUILD
+  # BUILD LOCAL
   # ──────────────────────────────────────────────
   build:
-    desc: Compile les images Docker (production, sans cache)
+    desc: Construit l'image Docker locale via docker-compose.yml
     deps: [install]
     cmds:
       - docker compose build --no-cache
@@ -44,7 +50,7 @@ tasks:
       - npm run start
 
   # ──────────────────────────────────────────────
-  # STACK DOCKER COMPOSE
+  # STACK DOCKER COMPOSE (locale)
   # ──────────────────────────────────────────────
   deploy:
     desc: Lance la stack complète via Docker Compose en arrière-plan
@@ -72,13 +78,75 @@ tasks:
       - docker compose down
 
   # ──────────────────────────────────────────────
+  # REGISTRY — publication de l'image
+  # ──────────────────────────────────────────────
+  push:
+    desc: "Construit l'image, la tag avec le hash Git ({{.GIT_SHA}}) et publie sur Docker Hub"
+    cmds:
+      - docker build
+          -t $DOCKER_USER/tp-task:{{.GIT_SHA}}
+          -t $DOCKER_USER/tp-task:latest
+          .
+      - docker push $DOCKER_USER/tp-task:{{.GIT_SHA}}
+      - docker push $DOCKER_USER/tp-task:latest
+      - echo "Publié → docker.io/$DOCKER_USER/tp-task:{{.GIT_SHA}}"
+
+  # ──────────────────────────────────────────────
+  # DÉPLOIEMENT DISTANT
+  # ──────────────────────────────────────────────
+  deploy:copy:
+    desc: Copie docker-compose.prod.yml sur le serveur et écrit le fichier .env distant
+    cmds:
+      # Envoie le fichier Compose de production
+      - scp -P $REMOTE_PORT docker-compose.prod.yml $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/docker-compose.yml
+      # Écrit un .env minimal sur le serveur avec le tag de l'image à déployer
+      - >-
+        ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_HOST
+        "printf 'DOCKER_USER=%s\nIMAGE_TAG=%s\n' '$DOCKER_USER' '{{.GIT_SHA}}' > $REMOTE_DIR/.env"
+
+  deploy:start:
+    desc: "Lance la stack sur le serveur via SSH (pull → up)"
+    cmds:
+      - >-
+        ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_HOST
+        "cd $REMOTE_DIR &&
+         docker compose pull &&
+         docker compose up -d --remove-orphans"
+
+  deploy:remote:
+    desc: "Déploiement complet : push registry → copie Compose → démarrage distant"
+    cmds:
+      - task: push
+      - task: deploy:copy
+      - task: deploy:start
+
+  # ──────────────────────────────────────────────
   # QUALITÉ (shift left)
   # ──────────────────────────────────────────────
+  lint:
+    desc: "Vérifie le formatage du code source — exit code non-nul si échec"
+    deps: [install]
+    cmds:
+      - npm run lint
+
+  format:
+    desc: Corrige automatiquement le formatage (ne pas utiliser en CI)
+    deps: [install]
+    cmds:
+      - npx prettier --write "src/**/*.{ts,html,css}"
+
   test:
-    desc: Lance les tests unitaires
+    desc: Lance les tests unitaires et affiche le résultat (pass / fail / nombre)
     deps: [install]
     cmds:
       - npm run test
+
+  ci:
+    desc: "Pipeline local : lint → test → build — s'arrête à la première erreur"
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
 
   # ──────────────────────────────────────────────
   # NETTOYAGE
