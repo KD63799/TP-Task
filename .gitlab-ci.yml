@@ -80,9 +80,8 @@ deploy:
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
   script:
-    # L'option -o StrictHostKeyChecking=no remplace le ssh-keyscan capricieux
     - |
-      ssh -p 63799 StrictHostKeyChecking=no "$PROD_USER@$PROD_HOST" "
+      ssh -p 63799 -o StrictHostKeyChecking=no "$PROD_USER@$PROD_HOST" "
         set -e
         cd ~/tp-task &&
         echo \"$CI_REGISTRY_PASSWORD\" | docker login -u \"$CI_REGISTRY_USER\" --password-stdin \"$CI_REGISTRY\" &&
