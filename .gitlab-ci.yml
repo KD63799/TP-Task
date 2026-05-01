@@ -80,6 +80,7 @@ deploy:
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
   script:
+    - scp -P 63799 -o StrictHostKeyChecking=no docker-compose.prod.yml "$PROD_USER@$PROD_HOST:~/tp-task/docker-compose.prod.yml"
     - |
       ssh -p 63799 -o StrictHostKeyChecking=no "$PROD_USER@$PROD_HOST" "
         set -e
